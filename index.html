@@ -460,10 +460,6 @@
 
       /* ---------- Dashboard setelah masuk ---------- */
       .dashboard { margin-bottom: 20px; }
-      .preview-note {
-        background: var(--warn-bg); color: var(--warn-ink);
-        border-radius: 10px; padding: 12px 14px; font-size: 14px; margin-bottom: 14px;
-      }
       .dash-banner {
         background: var(--ink); color: var(--bg);
         border-radius: var(--radius); padding: 22px;
@@ -511,11 +507,10 @@
       .mover .grow small { display: block; color: var(--ink-soft); font-weight: 400; }
       body.logged-in #status-card { display: none; }
       body.logged-in .grid { grid-template-columns: 1fr; }
-      body.previewing .grid { display: none; }
 
       /* ---------- Gerbang login: fitur terkunci sebelum masuk ---------- */
-      body:not(.logged-in):not(.previewing) .gated { display: none !important; }
-      body.logged-in #locked-teaser, body.previewing #locked-teaser { display: none; }
+      body:not(.logged-in) .gated { display: none !important; }
+      body.logged-in #locked-teaser { display: none; }
       #locked-teaser .teaser-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
       #locked-teaser .teaser-actions .btn.ghost { min-height: 48px; padding: 12px 22px; font-weight: 700; }
       #locked-teaser .feat-list { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 18px; padding: 0; list-style: none; }
@@ -934,10 +929,9 @@
           <h1>Memecoin Starter</h1>
         </div>
         <p class="lede">
-          <strong>The live price ticker</strong> below is the free preview — visible without signing in.
+          <strong>The live price ticker</strong> below is visible without signing in.
           Everything else is <strong>locked behind sign-in</strong>: the full memecoin list, new token radar, market
-          analysis, watchlist, and price alerts only appear after you <strong>sign in</strong> — or tap
-          <strong>Preview</strong> to peek at the layout first with sample data. Don't have an account? Sign up with
+          analysis, watchlist, and price alerts only appear after you <strong>sign in</strong>. Don't have an account? Sign up with
           your email and password using the form below — after signing in, this page becomes
           <strong>your personal dashboard</strong>. New: an <strong>AI Token Analyst</strong> powered by
           <strong>Firebase AI Logic</strong> hybrid inference — Gemini Nano on-device in Chrome, with a cloud
@@ -973,7 +967,7 @@
       <!-- Gerbang login: hanya tampil sebelum masuk -->
       <section class="card" id="locked-teaser" aria-labelledby="teaser-title" style="margin-bottom:20px;">
         <h2 id="teaser-title">Sign in to unlock all features</h2>
-        <p class="sub" style="margin:0;">The price ticker above is the preview. Locked behind sign-in:</p>
+        <p class="sub" style="margin:0;">The price ticker above stays visible. Locked behind sign-in:</p>
         <ul class="feat-list">
           <li>Token list + prices</li>
           <li>New token radar</li>
@@ -985,17 +979,12 @@
         </ul>
         <div class="teaser-actions">
           <a class="btn" href="#profile-card">Sign in / Sign up</a>
-          <button type="button" class="btn ghost" id="btn-preview">Preview without signing in</button>
         </div>
-        <p class="hint" style="margin-top:10px;">Preview shows the dashboard and all features with sample data — sample alerts can be tried, but the watchlist &amp; alerts aren't saved. Sign in to save them to your account.</p>
+        <p class="hint" style="margin-top:10px;">Sign in with your account so your watchlist and alerts are saved.</p>
       </section>
 
-      <!-- Dashboard: hanya tampil setelah masuk (atau dalam mode pratinjau) -->
+      <!-- Dashboard: hanya tampil setelah masuk -->
       <section id="dashboard" class="dashboard hidden" aria-labelledby="dash-title">
-        <div class="preview-note hidden" id="dash-preview-note">
-          <strong>Preview mode</strong> — this is a sample of the signed-in view, with a sample name and email.
-          Sign in with your account to see your real name, profile, and watchlist here.
-        </div>
         <div class="dash-banner">
           <div class="avatar" id="dash-avatar"><span>?</span></div>
           <div>
@@ -1005,7 +994,6 @@
           <span class="dash-badge" id="dash-badge">Active account</span>
           <div style="flex:1"></div>
           <button class="btn ghost" type="button" id="dash-logout">Sign out</button>
-          <button class="btn ghost hidden" type="button" id="dash-exit-preview">Close preview</button>
         </div>
 
         <div class="dash-stats">
@@ -1061,7 +1049,7 @@
 
         <div class="card" style="margin-top:14px;" id="dash-price-alerts">
           <h3 id="alerts-title">My price alerts</h3>
-          <p class="sub">Set a price target for any token. Alert status is checked against the snapshot price on this page; alerts are saved to your account in Firestore, and in preview mode you can try them without saving.</p>
+          <p class="sub">Set a price target for any token. Alert status is checked against the snapshot price on this page; alerts are saved to your account in Firestore.</p>
           <form id="alert-form" novalidate>
             <div class="form-row">
               <div><label for="al-token">Token</label><select id="al-token"></select></div>
@@ -1151,7 +1139,7 @@
             <form id="auth-form" novalidate>
               <div id="field-name">
                 <label for="in-name">Display name</label>
-                <input type="text" id="in-name" autocomplete="name" maxlength="50" placeholder="E.g. Reja" />
+                <input type="text" id="in-name" autocomplete="name" maxlength="50" placeholder="Your display name" />
               </div>
               <label for="in-email">Email</label>
               <input type="email" id="in-email" autocomplete="email" placeholder="you@email.com" required />
@@ -1526,7 +1514,6 @@ If the AI can't be reached yet, this panel shows a clearly labeled local snapsho
       var mode = "daftar"; // "daftar" | "masuk"
       var currentUser = null;
       var existingProfile = null;
-      var previewMode = false;
 
       function $(id) { return document.getElementById(id); }
 
@@ -1726,27 +1713,17 @@ If the AI can't be reached yet, this panel shows a clearly labeled local snapsho
         syncDashboard();
       }
 
-      /* ---------- Dashboard setelah masuk / pratinjau ---------- */
+      /* ---------- Dashboard setelah masuk ---------- */
       function syncDashboard() {
-        var inPreview = previewMode && !currentUser;
-        var show = !!currentUser || inPreview;
+        var show = !!currentUser;
         $("dashboard").classList.toggle("hidden", !show);
         document.body.classList.toggle("logged-in", !!currentUser);
-        document.body.classList.toggle("previewing", inPreview);
-        $("dash-preview-note").classList.toggle("hidden", !inPreview);
-        $("dash-logout").classList.toggle("hidden", inPreview);
-        $("dash-exit-preview").classList.toggle("hidden", !inPreview);
-        $("dash-badge").textContent = inPreview ? "Preview" : "Active account";
+        $("dash-badge").textContent = "Active account";
         if (!show) return;
         var name, email, photo = null;
-        if (inPreview) {
-          name = "Sample User";
-          email = "sample@email.com";
-        } else {
-          name = (existingProfile && existingProfile.displayName) || currentUser.displayName || "";
-          email = currentUser.email || "";
-          photo = existingProfile && existingProfile.photoURL;
-        }
+        name = (existingProfile && existingProfile.displayName) || currentUser.displayName || "";
+        email = currentUser.email || "";
+        photo = existingProfile && existingProfile.photoURL;
         $("dash-title").textContent = "Hello, " + (name || "welcome") + "!";
         $("dash-email").textContent = email;
         var box = $("dash-avatar");
@@ -1768,23 +1745,6 @@ If the AI can't be reached yet, this panel shows a clearly labeled local snapsho
         if (!sdkReady || !auth) return;
         auth.signOut().catch(function () { /* abaikan */ });
       });
-      $("dash-exit-preview").addEventListener("click", function () {
-        previewMode = false;
-        syncDashboard();
-        if (typeof renderWatchlist === "function") renderWatchlist();
-        window.scrollTo({ top: 0, behavior: "smooth" });
-      });
-      var previewBtn = $("btn-preview");
-      if (previewBtn) {
-        previewBtn.addEventListener("click", function () {
-          previewMode = true;
-          syncDashboard();
-          if (typeof renderWatchlist === "function") renderWatchlist();
-          if (typeof renderAlerts === "function") renderAlerts();
-          var dash = $("dashboard");
-          if (dash) dash.scrollIntoView({ behavior: "smooth", block: "start" });
-        });
-      }
       /* ---------- Pantau status login ---------- */
       if (sdkReady) {
         auth.onAuthStateChanged(function (user) {
@@ -1806,7 +1766,6 @@ If the AI can't be reached yet, this panel shows a clearly labeled local snapsho
             startWatchlist(user.uid);
           } else {
             existingProfile = null;
-            previewMode = false;
             $("user-view").classList.add("hidden");
             $("auth-view").classList.remove("hidden");
             stopWatchlist();
@@ -2516,9 +2475,7 @@ If the AI can't be reached yet, this panel shows a clearly labeled local snapsho
           return;
         }
         if (!currentUser) {
-          note.textContent = previewMode
-            ? "Preview mode: this is a sample watchlist view — still empty. Sign in with your account so the tokens you watch are actually saved and appear here."
-            : "You haven't signed in. Sign in in the Account section above — after that, the tokens you watch are saved here and can be reopened anytime.";
+          note.textContent = "You haven't signed in. Sign in in the Account section above — after that, the tokens you watch are saved here and can be reopened anytime.";
           return;
         }
         if (watchError) {
@@ -2599,9 +2556,7 @@ If the AI can't be reached yet, this panel shows a clearly labeled local snapsho
         var msg = $("watchlist-msg");
         hideMsg(msg);
         if (!currentUser) {
-          showMsg(msg, previewMode
-            ? "This is preview mode — sign in in the Account section so your watchlist is saved to your account."
-            : "Sign in in the Account section so your watchlist is saved to your account.", "warn");
+          showMsg(msg, "Sign in in the Account section so your watchlist is saved to your account.", "warn");
           $("watchlist-title").scrollIntoView({ behavior: "smooth", block: "start" });
           return;
         }
@@ -2681,9 +2636,9 @@ If the AI can't be reached yet, this panel shows a clearly labeled local snapsho
       }
 
       function renderDashboardData() {
-        if (!currentUser && !previewMode) return;
+        if (!currentUser) return;
         var wkeys = Object.keys(watchMap);
-        $("dash-stat-watch").textContent = (previewMode && !currentUser) ? "—" : String(wkeys.length);
+        $("dash-stat-watch").textContent = String(wkeys.length);
 
         var sorted = TOKENS.slice().sort(function (a, b) { return b.c - a.c; });
         var top = sorted[0];
@@ -2695,9 +2650,7 @@ If the AI can't be reached yet, this panel shows a clearly labeled local snapsho
         var mini = $("dash-watch-mini");
         mini.innerHTML = "";
         var sum = $("dash-watch-summary");
-        if (previewMode && !currentUser) {
-          sum.textContent = "In preview mode there is no watchlist yet. After signing in, the tokens you watch are summarized here.";
-        } else if (!wkeys.length) {
+        if (!wkeys.length) {
           sum.textContent = "No tokens watched yet. Tap Watch in the token list or radar.";
         } else {
           sum.textContent = "You are watching " + wkeys.length + " tokens:";
@@ -2736,15 +2689,14 @@ If the AI can't be reached yet, this panel shows a clearly labeled local snapsho
       var alertsMap = {};
       var alertsUnsub = null;
       var alertsError = false;
-      var previewAlerts = {};
 
-      function activeAlerts() { return (previewMode && !currentUser) ? previewAlerts : alertsMap; }
+      function activeAlerts() { return alertsMap; }
 
       function renderAlerts() {
         var note = $("alert-note"), box = $("alert-list");
         if (!note || !box) return;
         box.innerHTML = "";
-        if (!currentUser && !previewMode) {
+        if (!currentUser) {
           note.textContent = "Sign in first to create price alerts.";
           return;
         }
@@ -2755,9 +2707,7 @@ If the AI can't be reached yet, this panel shows a clearly labeled local snapsho
         var map = activeAlerts();
         var keys = Object.keys(map);
         if (!keys.length) {
-          note.textContent = (previewMode && !currentUser)
-            ? "Preview mode: no alerts yet. Create one using the form above to try it — this sample isn't saved."
-            : "No price alerts yet. Create one using the form above.";
+          note.textContent = "No price alerts yet. Create one using the form above.";
           return;
         }
         note.textContent = keys.length + " active alerts:";
@@ -2816,12 +2766,6 @@ If the AI can't be reached yet, this panel shows a clearly labeled local snapsho
         if (!info) { showMsg(msg, "Choose a token first.", "warn"); return; }
         if (!(target > 0)) { showMsg(msg, "The target price must be greater than 0.", "warn"); return; }
         var id = key + "_" + dir + "_" + String(target).replace(".", "_");
-        if (previewMode && !currentUser) {
-          previewAlerts[id] = { key: key, symbol: info.s, name: info.n, dir: dir, target: target };
-          renderAlerts();
-          showMsg(msg, "Sample alert created (preview mode — not saved). The snapshot price of " + info.s + " is currently " + fmtPrice(info.p) + ".", "ok");
-          return;
-        }
         if (!currentUser) { showMsg(msg, "Sign in in the Account section so the alert is saved to your account.", "warn"); return; }
         if (!sdkReady) { showMsg(msg, "The Firebase SDK failed to load. Check your internet connection and reload the page.", "err"); return; }
         db.collection("users").doc(currentUser.uid).collection("alerts").doc(id).set({
@@ -2840,10 +2784,7 @@ If the AI can't be reached yet, this panel shows a clearly labeled local snapsho
         var t = ev.target;
         if (t.classList && t.getAttribute && t.getAttribute("data-alert-remove")) {
           var aid = t.getAttribute("data-alert-remove");
-          if (previewMode && !currentUser) {
-            delete previewAlerts[aid];
-            renderAlerts();
-          } else if (currentUser && sdkReady) {
+          if (currentUser && sdkReady) {
             db.collection("users").doc(currentUser.uid).collection("alerts").doc(aid).delete()
               .catch(function (err) { showMsg($("alert-msg"), friendlyError(err), "err"); });
           }
