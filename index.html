@@ -1110,8 +1110,8 @@
             </li>
             <li>
               <span class="tick" aria-hidden="true" style="background:var(--warn-bg);color:var(--warn-ink);">!</span>
-              <span>AI Analyst wired in — one console step left
-                <small>The page already calls Firebase AI Logic (hybrid Gemini Nano + cloud). Enable AI Logic once in the Firebase console so cloud answers work — steps are in the AI Token Analyst section below.</small>
+              <span>AI Analyst — cloud blocked by App Check until its site key is added
+                <small>Firebase enforces App Check for AI Logic (mandatory since Nov 2, 2026; this project shows “Registered (Enforced)”), and this page shipped without ever initializing App Check, so cloud Gemini rejects live requests and the SDK reports it as a generic network error. Fix steps are in the AI Token Analyst section: add the reCAPTCHA Enterprise site key to the page, or delay enforcement under App Check → APIs for judging.</small>
               </span>
             </li>
           </ul>
@@ -1220,7 +1220,8 @@
           <div class="ai-status" id="ai-status" aria-label="AI status">
             <span class="ai-chip" id="ai-chip-sdk"><span class="dot2" aria-hidden="true"></span>AI SDK <small id="ai-chip-sdk-t">not checked yet</small></span>
             <span class="ai-chip" id="ai-chip-nano"><span class="dot2" aria-hidden="true"></span>On-device · Gemini Nano <small id="ai-chip-nano-t">not checked yet</small></span>
-            <span class="ai-chip" id="ai-chip-cloud"><span class="dot2" aria-hidden="true"></span>Cloud · Gemini <small id="ai-chip-cloud-t">enable AI Logic in the console</small></span>
+            <span class="ai-chip" id="ai-chip-cloud"><span class="dot2" aria-hidden="true"></span>Cloud · Gemini <small id="ai-chip-cloud-t">not verified yet</small></span>
+            <span class="ai-chip err" id="ai-chip-appcheck"><span class="dot2" aria-hidden="true"></span>App Check <small id="ai-chip-appcheck-t">checking…</small></span>
             <button type="button" class="btn ghost" id="ai-check" style="min-height:40px;padding:8px 16px;font-size:14px;">Check AI status</button>
           </div>
 
@@ -1270,13 +1271,15 @@ If the AI can't be reached yet, this panel shows a clearly labeled local snapsho
             </div>
           </div>
 
-          <details class="ai-setup">
-            <summary>One-time setup so the cloud model works (about 2 minutes)</summary>
+          <details class="ai-setup" open>
+            <summary>Why cloud AI is blocked on the live site — and the fix (read this first)</summary>
             <ol>
-              <li>Open <a href="https://console.firebase.google.com/project/building-project-memecoin/ai-logic" target="_blank" rel="noopener">Firebase Console → AI Services → AI Logic</a> for the <em>building-project-memecoin</em> project and click <strong>Get started</strong>. Choose the <strong>Gemini Developer API</strong> (free tier). Full walkthrough: <a href="https://firebase.google.com/docs/ai-logic/hybrid/web/get-started" target="_blank" rel="noopener">Firebase AI Logic hybrid guide</a>.</li>
-              <li><strong>App Check:</strong> the setup workflow enforces App Check for AI Logic. For judging and local development, a <strong>debug token</strong> is accepted: this page sets <code>self.FIREBASE_APPCHECK_DEBUG_TOKEN = true</code>, so open the browser console, copy the printed App Check debug token, and register it under <strong>Firebase Console → App Check → Apps → Manage debug tokens</strong>. For production, paste a reCAPTCHA Enterprise site key into <code>AI_APPCHECK_SITE_KEY</code> at the top of this page's AI script instead.</li>
-              <li><strong>On-device (Chrome):</strong> use Chrome 139+ on desktop and enable <code>chrome://flags/#prompt-api-for-gemini-nano-multimodal-input</code>, then restart Chrome. The first on-device request may download Gemini Nano — the Analyze button shows download progress.</li>
-              <li>Done — Hybrid mode now answers on-device when Nano is available and in the cloud everywhere else. Nothing else to change in this page.</li>
+              <li><strong>Diagnosis (confirmed on the live site, signed in, phone browser):</strong> since <strong>Nov 2, 2026</strong>, Firebase <strong>enforces App Check for AI Logic</strong> — this project shows <strong>“Registered (Enforced)”</strong> in the console. Every cloud request must carry a valid App Check token. This page previously sent <strong>none</strong>: no reCAPTCHA Enterprise site key was set, so App Check was never initialized, and the debug-token flag was switched on for the live domain, which does nothing for real visitors. Firebase rejects the request before it reaches Gemini, and the SDK surfaces that rejection as a generic <em>network / fetch</em> error — that is the misleading “Network problem” message in the screenshot, not a connection problem.</li>
+              <li><strong>Production fix (about 5 minutes, one time):</strong> open <a href="https://console.firebase.google.com/project/building-project-memecoin/appcheck" target="_blank" rel="noopener">Firebase Console → App Check → Apps</a>, open the <strong>Planning With AI</strong> web app — if the AI Logic setup auto-registered a <strong>reCAPTCHA Enterprise</strong> provider, its <strong>site key</strong> is shown there. If there is no key yet, create a score-based website key for <code>riu-ui.github.io</code> in Google Cloud → Security → reCAPTCHA, register it for this app in App Check, then paste the <strong>site key</strong> (it is public by design and safe to ship in a page) as <code>AI_APPCHECK_SITE_KEY</code> at the top of this page’s AI script and republish the live site. This page now initializes App Check and <em>waits for it</em> before the first AI request, and requests limited-use App Check tokens as AI Logic expects.</li>
+              <li><strong>Temporary judging workaround (only if the console offers it):</strong> Firebase Console → App Check → <strong>APIs</strong> → Firebase AI Logic API → delay the enforcement date (latest Jan 21, 2027). While enforcement is delayed, cloud answers work without a token; wire the site key before the delay expires.</li>
+              <li><strong>Why the old debug-token advice could never fix the live site:</strong> a debug token is random per browser, must be copied out of a desktop browser console and registered by hand — a phone browser has no console to copy it from, and no visitor can register theirs. Debug mode is now enabled on <code>localhost</code> only, never on the live domain.</li>
+              <li><strong>Also fixed in this page:</strong> the cloud model is pinned to <code>gemini-2.5-flash</code> (the floating <code>gemini-flash-latest</code> alias is gone), and on phones — where Gemini Nano does not exist — Hybrid mode now goes <strong>straight to the cloud model</strong> instead of attempting an on-device session first.</li>
+              <li><strong>On-device (Chrome desktop):</strong> use Chrome 139+ and enable <code>chrome://flags/#prompt-api-for-gemini-nano-multimodal-input</code>, then restart Chrome. The first on-device request may download Gemini Nano — the Analyze button shows download progress. On-device mode never needs App Check.</li>
             </ol>
           </details>
         </section>
@@ -3522,11 +3525,18 @@ If the AI can't be reached yet, this panel shows a clearly labeled local snapsho
          - Mode hybrid: InferenceMode.PREFER_ON_DEVICE — Gemini Nano
            di perangkat (Chrome Prompt API) bila tersedia, fallback
            otomatis ke model Gemini cloud (GoogleAIBackend).
-         - App Check: untuk produksi isi AI_APPCHECK_SITE_KEY dengan
-           site key reCAPTCHA Enterprise. Selama pengembangan/judging,
-           debug provider diaktifkan di bawah ini dan token debug-nya
-           (muncul di console browser) didaftarkan di Firebase Console
-           → App Check → Manage debug tokens.
+         - App Check (PERBAIKAN LIVE): sejak 2 Nov 2026 Firebase
+           mewajibkan token App Check untuk AI Logic dan proyek ini
+           Enforced. Versi sebelumnya TIDAK PERNAH menginisialisasi
+           App Check (site key kosong) sehingga semua request cloud
+           di situs live ditolak dan dilaporkan SDK sebagai error
+           "network" generik. Sekarang: App Check diinisialisasi dari
+           AI_APPCHECK_SITE_KEY dan DI-AWAIT sebelum request pertama;
+           token limited-use diminta; mode debug HANYA di localhost
+           (token debug acak per browser tidak bisa dipakai di live /
+           HP). Tanpa site key, chip App Check halaman menyatakan
+           cloud terblokir — tidak lagi menyamar sebagai masalah
+           jaringan.
          - Bila AI belum bisa dijangkau (AI Logic belum diaktifkan di
            console, App Check menolak, Nano tidak ada, atau offline),
            halaman TIDAK mengarang jawaban AI: pengguna ditawari
@@ -3534,9 +3544,20 @@ If the AI can't be reached yet, this panel shows a clearly labeled local snapsho
          =============================================================== */
       (function () {
         var AI_SDK_VERSION = "12.11.0"; // >= 12.5.0 wajib untuk hybrid web
-        var AI_CLOUD_MODEL = "gemini-flash-latest";
-        var AI_APPCHECK_SITE_KEY = ""; // site key reCAPTCHA Enterprise (produksi)
-        try { self.FIREBASE_APPCHECK_DEBUG_TOKEN = true; } catch (e) { /* abaikan */ }
+        var AI_CLOUD_MODEL = "gemini-2.5-flash"; // dipin: alias "gemini-flash-latest" yang melayang sudah dibuang
+        // SITE KEY reCAPTCHA Enterprise (PUBLIK by design — aman tampil di halaman).
+        // Ambil dari Firebase Console → App Check → Apps → Planning With AI.
+        // KOSONG = App Check tidak bisa diinisialisasi = cloud DITOLAK selama
+        // enforcement aktif. Isi key ini lalu publish ulang situs live.
+        var AI_APPCHECK_SITE_KEY = "";
+        var AI_IS_LOCAL = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
+        // Debug App Check HANYA untuk pengembangan lokal. Di domain live flag
+        // ini tidak menolong (token acak per browser, wajib daftar manual dari
+        // console desktop — mustahil dari HP) dan bisa meng-override atestasi
+        // asli, jadi JANGAN pernah dinyalakan di produksi.
+        if (AI_IS_LOCAL) { try { self.FIREBASE_APPCHECK_DEBUG_TOKEN = true; } catch (e) { /* abaikan */ } }
+        var appCheckState = AI_APPCHECK_SITE_KEY ? "pending" : "none"; // none | pending | ready | failed
+        var aiSdkPromise = null;
 
         var aiMode = "PREFER_ON_DEVICE";
         var aiBusy = false;
@@ -3556,6 +3577,12 @@ If the AI can't be reached yet, this panel shows a clearly labeled local snapsho
           var chip = $(id);
           chip.className = "ai-chip" + (state ? " " + state : "");
           $(id + "-t").textContent = text;
+        }
+        function updateAppCheckChip() {
+          if (appCheckState === "ready") setChip("ai-chip-appcheck", "ok", "token provider ready (reCAPTCHA Enterprise)");
+          else if (appCheckState === "failed") setChip("ai-chip-appcheck", "err", "provider failed to initialize — cloud will be rejected");
+          else if (appCheckState === "pending") setChip("ai-chip-appcheck", "warn", "site key set — initializes on first AI use");
+          else setChip("ai-chip-appcheck", "err", "no site key in this page — cloud blocked while App Check is enforced (fix below)");
         }
 
         /* ---------- Isi pilihan token & mode ---------- */
@@ -3652,31 +3679,43 @@ If the AI can't be reached yet, this panel shows a clearly labeled local snapsho
         /* ---------- Muat SDK AI Logic (modular, dari CDN) ---------- */
         function loadAiSdk() {
           if (aiSdk) return Promise.resolve(aiSdk);
+          if (aiSdkPromise) return aiSdkPromise;
           var base = "https://www.gstatic.com/firebasejs/" + AI_SDK_VERSION + "/";
-          return Promise.all([
+          aiSdkPromise = Promise.all([
             import(base + "firebase-app.js"),
-            import(base + "firebase-ai.js")
+            import(base + "firebase-ai.js"),
+            AI_APPCHECK_SITE_KEY ? import(base + "firebase-app-check.js") : Promise.resolve(null)
           ]).then(function (mods) {
-            var appMod = mods[0], aiMod = mods[1];
+            var appMod = mods[0], aiMod = mods[1], acMod = mods[2];
             var app = null;
             var apps = appMod.getApps ? appMod.getApps() : [];
             for (var i = 0; i < apps.length; i++) if (apps[i].name === "ai-logic") app = apps[i];
             if (!app) app = appMod.initializeApp(firebaseConfig, "ai-logic");
-            if (AI_APPCHECK_SITE_KEY) {
-              import(base + "firebase-app-check.js").then(function (ac) {
-                try {
-                  ac.initializeAppCheck(app, {
-                    provider: new ac.ReCaptchaEnterpriseProvider(AI_APPCHECK_SITE_KEY),
-                    isTokenAutoRefreshEnabled: true
-                  });
-                } catch (e) { /* App Check sudah aktif / gagal — abaikan */ }
-              }).catch(function () { /* abaikan */ });
+            // App Check WAJIB terpasang SEBELUM getAI / request pertama dan
+            // langkah ini sekarang di-await (dulu fire-and-forget = balapan:
+            // request pertama terkirim sebelum provider siap). Tanpa site
+            // key tidak ada provider yang bisa dipasang — state dicatat
+            // jujur supaya error-nya tidak menyamar jadi masalah jaringan.
+            if (acMod) {
+              try {
+                acMod.initializeAppCheck(app, {
+                  provider: new acMod.ReCaptchaEnterpriseProvider(AI_APPCHECK_SITE_KEY),
+                  isTokenAutoRefreshEnabled: true
+                });
+                appCheckState = "ready";
+              } catch (e) {
+                // initializeAppCheck melempar bila sudah terpasang: itu berarti siap.
+                appCheckState = /already|duplicate/i.test(String(e && e.message || e)) ? "ready" : "failed";
+                if (appCheckState === "failed") console.error("[AI] App Check init failed:", e);
+              }
             }
-            var ai = aiMod.getAI(app, { backend: new aiMod.GoogleAIBackend() });
+            updateAppCheckChip();
+            var ai = aiMod.getAI(app, { backend: new aiMod.GoogleAIBackend(), useLimitedUseAppCheckTokens: true });
             aiSdk = { app: app, ai: ai, InferenceMode: aiMod.InferenceMode, getGenerativeModel: aiMod.getGenerativeModel };
             setChip("ai-chip-sdk", "ok", "loaded (Firebase AI Logic)");
             return aiSdk;
-          });
+          }).catch(function (err) { aiSdkPromise = null; throw err; });
+          return aiSdkPromise;
         }
         function getAiModel(mode) {
           if (!aiModels[mode]) {
@@ -3686,6 +3725,18 @@ If the AI can't be reached yet, this panel shows a clearly labeled local snapsho
             });
           }
           return aiModels[mode];
+        }
+        /* Di perangkat tanpa Gemini Nano (semua HP, browser non-Chrome),
+           PREFER_ON_DEVICE tidak boleh mencoba sesi on-device dulu:
+           langsung pakai model cloud-only supaya request-nya murni cloud
+           + App Check, bukan kegagalan sesi perangkat yang dilaporkan
+           SDK sebagai error jaringan. */
+        function effectiveAiMode() {
+          if (aiMode === "PREFER_ON_DEVICE" && nanoAvail !== null &&
+              nanoAvail !== "available" && nanoAvail !== "downloadable" && nanoAvail !== "downloading") {
+            return "ONLY_IN_CLOUD";
+          }
+          return aiMode;
         }
 
         /* ---------- Probe Gemini Nano (Chrome Prompt API) ---------- */
@@ -3712,21 +3763,35 @@ If the AI can't be reached yet, this panel shows a clearly labeled local snapsho
 
         /* ---------- Pesan error AI yang bisa ditindaklanjuti ---------- */
         function friendlyAiError(err) {
+          try { console.error("[AI] request failed:", err); } catch (e) { /* abaikan */ }
           var raw = ((err && err.code) || "") + " " + ((err && err.message) || String(err || ""));
           var low = raw.toLowerCase();
-          if (low.indexOf("app-check") >= 0 || low.indexOf("appcheck") >= 0 || low.indexOf("unauthenticated") >= 0) {
-            return "Firebase App Check blocked the AI request. Register this browser's debug token (printed in the browser console) under Firebase Console → App Check → Manage debug tokens, or add a reCAPTCHA Enterprise site key — see the setup steps at the bottom of this section.";
+          var detail = raw.trim().slice(0, 180);
+          // PENYEBAB UTAMA DI SITUS LIVE: enforcement App Check aktif tapi
+          // halaman tidak mengirim token apa pun (tidak ada site key).
+          // SDK membungkus penolakan ini sebagai error fetch/network
+          // generik, jadi deteksi TIDAK boleh berhenti di kata "network":
+          // selama tidak ada provider App Check, kegagalan cloud apa pun
+          // dijelaskan sebagai App Check dulu — bukan menyuruh cek koneksi.
+          if (aiMode !== "ONLY_ON_DEVICE" && appCheckState === "none") {
+            return "Cloud Gemini is blocked by Firebase App Check — this is the live-site failure, not your connection. App Check is Enforced for AI Logic in this project, but this page contains no reCAPTCHA Enterprise site key, so it sends no App Check token and Firebase rejects the request before it reaches Gemini (the SDK reports that rejection as a generic network/fetch error). Fix: add the site key from Firebase Console → App Check → Apps → Planning With AI as AI_APPCHECK_SITE_KEY in this page and republish — or, for judging only, delay enforcement under App Check → APIs. Full steps are in the panel at the bottom of this section. Raw error: " + detail;
           }
-          if (low.indexOf("not-found") >= 0 || low.indexOf("not found") >= 0 || low.indexOf("generativelanguage") >= 0 || low.indexOf("permission") >= 0 || low.indexOf("api key") >= 0 || low.indexOf("403") >= 0 || low.indexOf("404") >= 0) {
-            return "The cloud Gemini model isn't reachable for this project yet — AI Logic is probably not enabled. Open Firebase Console → AI Services → AI Logic → Get started (Gemini Developer API), then try again. The setup steps are at the bottom of this section. On-device mode can still work in Chrome without it.";
+          if (low.indexOf("app-check") >= 0 || low.indexOf("appcheck") >= 0 || low.indexOf("unauthenticated") >= 0 || low.indexOf("token") >= 0 && low.indexOf("check") >= 0) {
+            return "Firebase App Check blocked the AI request (provider state: " + appCheckState + "). If a site key is set, confirm the key belongs to this web app, that riu-ui.github.io is an allowed domain for the reCAPTCHA Enterprise key, and that the key is registered under Firebase Console → App Check → Apps. Raw error: " + detail;
+          }
+          if (low.indexOf("not-found") >= 0 || low.indexOf("not found") >= 0 || low.indexOf("generativelanguage") >= 0 || low.indexOf("api key") >= 0 || low.indexOf("404") >= 0) {
+            return "The cloud model \"" + AI_CLOUD_MODEL + "\" was not found for this project, or the Gemini Developer API is not enabled. Open Firebase Console → AI Services → AI Logic and confirm Get started was completed with the Gemini Developer API (the backend this page calls). Raw error: " + detail;
+          }
+          if (low.indexOf("permission") >= 0 || low.indexOf("403") >= 0 || low.indexOf("forbidden") >= 0) {
+            return "Firebase rejected the cloud request (permission / 403). With App Check Enforced this almost always means the App Check token was missing or invalid — verify the site key setup in the panel below; also confirm AI Logic is enabled for this project. Raw error: " + detail;
           }
           if (aiMode === "ONLY_ON_DEVICE" && (low.indexOf("unavailable") >= 0 || low.indexOf("not available") >= 0 || low.indexOf("on-device") >= 0 || low.indexOf("device") >= 0)) {
             return "Gemini Nano isn't available on this browser/device, and On-device only mode never falls back to the cloud. Switch to Hybrid mode, or use Chrome 139+ on desktop with the Gemini Nano flag enabled (see setup steps).";
           }
           if (low.indexOf("network") >= 0 || low.indexOf("fetch") >= 0 || low.indexOf("offline") >= 0) {
-            return "Network problem while contacting the AI. Check your connection and try again — or use the local snapshot analysis below, which works fully offline.";
+            return "The AI endpoint could not be reached (network/fetch failure) even though App Check is configured (" + appCheckState + "). Check the connection and any ad-blocker/VPN, then try again — or use the local snapshot analysis below, which works fully offline. Raw error: " + detail;
           }
-          return "The AI request failed (" + (raw.trim().slice(0, 140) || "unknown error") + "). You can retry, switch the inference mode, or use the local snapshot analysis below.";
+          return "The AI request failed (" + (detail || "unknown error") + "). You can retry, switch the inference mode, or use the local snapshot analysis below.";
         }
 
         /* ---------- Analisa lokal (BUKAN AI — dari angka snapshot) ---------- */
@@ -3776,6 +3841,7 @@ If the AI can't be reached yet, this panel shows a clearly labeled local snapsho
           aiBusy = true;
           lastKind = kind;
           var runBtn = $("ai-run"), briefBtn = $("ai-brief");
+          var effMode = aiMode; // di-hoist: dipakai lintas .then() di bawah
           runBtn.disabled = true; briefBtn.disabled = true;
           hideMsg($("ai-msg"));
           $("ai-local").classList.add("hidden");
@@ -3787,10 +3853,11 @@ If the AI can't be reached yet, this panel shows a clearly labeled local snapsho
             "Give a balanced quick take: momentum, liquidity & activity, the main risks, and what to watch next.";
           var prompt = buildPrompt(kind, kind === "market" ? question : question);
 
-          loadAiSdk().then(function () {
-            var model = getAiModel(aiMode);
+          (nanoAvail === null ? probeNano() : Promise.resolve()).then(function () { return loadAiSdk(); }).then(function () {
+            effMode = effectiveAiMode();
+            var model = getAiModel(effMode);
             var init = Promise.resolve();
-            if (aiMode !== "ONLY_IN_CLOUD" && model.initializeDeviceModel) {
+            if (effMode !== "ONLY_IN_CLOUD" && model.initializeDeviceModel) {
               init = Promise.resolve(model.initializeDeviceModel(function (v) {
                 if (typeof v === "number" && v > 0 && v < 1) {
                   setOut("Downloading the Gemini Nano on-device model… " + Math.round(v * 100) + "%");
@@ -3823,8 +3890,8 @@ If the AI can't be reached yet, this panel shows a clearly labeled local snapsho
             }).then(function () { return text; });
           }).then(function (text) {
             if (!text) throw new Error("Empty AI response");
-            if (aiMode === "ONLY_ON_DEVICE") setBadge("Answered on-device · Gemini Nano via Firebase AI Logic", "device");
-            else if (aiMode === "ONLY_IN_CLOUD") setBadge("Answered in the cloud · Gemini (" + AI_CLOUD_MODEL + ") via Firebase AI Logic", "cloud");
+            if (effMode === "ONLY_ON_DEVICE") setBadge("Answered on-device · Gemini Nano via Firebase AI Logic", "device");
+            else if (effMode === "ONLY_IN_CLOUD") setBadge("Answered in the cloud · Gemini (" + AI_CLOUD_MODEL + ") via Firebase AI Logic", "cloud");
             else setBadge("Answered via Firebase AI Logic hybrid inference — Gemini Nano on-device preferred, cloud Gemini fallback", nanoAvail === "available" ? "device" : "cloud");
             setChip("ai-chip-cloud", "ok", "reachable");
             showMsg($("ai-msg"), "AI analysis ready. Data basis: snapshot Nov 19, 2026, 00:20 WIB — not live prices, not financial advice.", "ok");
@@ -3833,7 +3900,7 @@ If the AI can't be reached yet, this panel shows a clearly labeled local snapsho
             setOut("The AI couldn't answer this time, so nothing was made up. Reason and fix are in the message below — or tap “Use local snapshot analysis instead” for an instant, clearly labeled analysis computed from the same snapshot numbers.");
             showMsg($("ai-msg"), friendlyAiError(err), "err");
             $("ai-local").classList.remove("hidden");
-            if (aiMode !== "ONLY_ON_DEVICE") setChip("ai-chip-cloud", "err", "blocked — see the fix below");
+            if (effMode !== "ONLY_ON_DEVICE") setChip("ai-chip-cloud", "err", appCheckState === "none" ? "blocked by App Check — no site key (fix below)" : "blocked — see the fix below");
           }).finally(function () {
             aiBusy = false;
             runBtn.disabled = false; briefBtn.disabled = false;
@@ -3852,8 +3919,14 @@ If the AI can't be reached yet, this panel shows a clearly labeled local snapsho
           probeNano();
           loadAiSdk().then(function () {
             setChip("ai-chip-sdk", "ok", "loaded (Firebase AI Logic)");
-            setChip("ai-chip-cloud", "warn", "SDK ready — first cloud answer verifies console setup");
-            showMsg($("ai-msg"), "SDK loaded. Gemini Nano status is shown above; the cloud path is verified on your first successful Analyze.", "ok");
+            updateAppCheckChip();
+            if (appCheckState === "none") {
+              setChip("ai-chip-cloud", "err", "blocked by App Check — no site key in page");
+              showMsg($("ai-msg"), "SDK loaded and Gemini Nano status is shown above — but cloud Gemini WILL be rejected on the live site: App Check is Enforced and this page has no reCAPTCHA Enterprise site key, so it sends no token. Add the key (steps at the bottom of this section) and republish. On-device mode in Chrome desktop is unaffected.", "warn");
+            } else {
+              setChip("ai-chip-cloud", "warn", "SDK + App Check ready — first cloud answer verifies the setup end to end");
+              showMsg($("ai-msg"), "SDK loaded and App Check is initialized. Gemini Nano status is shown above; the cloud path is verified on your first successful Analyze.", "ok");
+            }
           }).catch(function (err) {
             setChip("ai-chip-sdk", "err", "failed to load — check connection");
             showMsg($("ai-msg"), friendlyAiError(err), "err");
@@ -3897,7 +3970,9 @@ If the AI can't be reached yet, this panel shows a clearly labeled local snapsho
           runAi("token");
         });
 
-        /* Probe Nano sekali saat halaman dimuat (tanpa memuat SDK AI) */
+        /* Probe Nano + status App Check sekali saat halaman dimuat */
+        updateAppCheckChip();
+        if (appCheckState === "none") setChip("ai-chip-cloud", "err", "blocked by App Check — no site key (fix below)");
         probeNano();
       })();
     </script>
