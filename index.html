@@ -1136,15 +1136,15 @@
               <button type="button" id="tab-masuk" role="tab" aria-selected="false">Sign in</button>
             </div>
 
-            <form id="auth-form" novalidate>
+            <form id="auth-form" novalidate autocomplete="off">
               <div id="field-name">
                 <label for="in-name">Display name</label>
-                <input type="text" id="in-name" autocomplete="name" maxlength="50" placeholder="Your display name" />
+                <input type="text" id="in-name" autocomplete="off" maxlength="50" placeholder="Your display name" />
               </div>
               <label for="in-email">Email</label>
-              <input type="email" id="in-email" autocomplete="email" placeholder="you@email.com" required />
+              <input type="email" id="in-email" autocomplete="off" placeholder="you@email.com" required />
               <label for="in-pass">Password <span class="hint">(minimum 6 characters)</span></label>
-              <input type="password" id="in-pass" autocomplete="current-password" placeholder="••••••••" required />
+              <input type="password" id="in-pass" autocomplete="off" placeholder="••••••••" required />
               <button class="btn" type="submit" id="auth-submit">Sign up</button>
             </form>
             <div class="msg" id="auth-msg" role="status" aria-live="polite"></div>
@@ -1523,6 +1523,72 @@ If the AI can't be reached yet, this panel shows a clearly labeled local snapsho
       }
       function hideMsg(el) { el.className = "msg"; el.textContent = ""; }
 
+      /* Kosongkan form akun sepenuhnya — dipanggil saat berhasil masuk
+         (supaya password tidak tertinggal di form tersembunyi) dan saat
+         keluar (supaya nama, email, dan password tidak "nyangkut"
+         muncul lagi di form).
+         Mengosongkan value saja TIDAK cukup di browser asli: password
+         manager / autofill Chrome mengisi ulang email + password begitu
+         form tampil lagi setelah sign out, dan autocomplete="off"
+         diabaikan untuk form login. Karena itu setelah dikosongkan
+         field dikunci readonly (autofill tidak mengisi field readonly)
+         dan pengosongan diulang terjadwal untuk memenangkan balapan
+         dengan autofill; kunci dibuka otomatis begitu pengguna
+         menyentuh / fokus ke field, dan pengulangan berhenti menyentuh
+         field yang sudah dibuka supaya ketikan pengguna tidak terhapus. */
+      function wipeAuthField(el) { if (el) el.value = ""; }
+      function unlockAuthField() { this.readOnly = false; }
+      function lockAuthField(el) {
+        if (!el) return;
+        el.readOnly = true;
+        if (!el.getAttribute("data-unlock-bound")) {
+          el.setAttribute("data-unlock-bound", "1");
+          el.addEventListener("focus", unlockAuthField);
+          el.addEventListener("pointerdown", unlockAuthField);
+          el.addEventListener("keydown", unlockAuthField);
+        }
+      }
+      function clearAuthForm() {
+        var form = $("auth-form");
+        if (form) form.reset();
+        var nameEl = $("in-name"), emailEl = $("in-email"), passEl = $("in-pass");
+        wipeAuthField(nameEl);
+        wipeAuthField(emailEl);
+        wipeAuthField(passEl);
+        lockAuthField(nameEl);
+        lockAuthField(emailEl);
+        lockAuthField(passEl);
+        hideMsg($("auth-msg"));
+        var btn = $("auth-submit");
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = mode === "daftar" ? "Sign up" : "Sign in";
+        }
+        // Ulangi pengosongan beberapa kali sesudah form tampil lagi:
+        // autofill browser bisa mengisi ulang beberapa saat setelah
+        // sign out. Hanya field yang masih terkunci (belum disentuh
+        // pengguna) yang dikosongkan ulang.
+        [120, 450, 1000, 2000].forEach(function (delay) {
+          setTimeout(function () {
+            [nameEl, emailEl, passEl].forEach(function (el) {
+              if (el && el.readOnly) el.value = "";
+            });
+          }, delay);
+        });
+      }
+      function clearProfileForm() {
+        var form = $("profile-form");
+        if (form) form.reset();
+        $("in-pname").value = "";
+        $("in-photo").value = "";
+        $("who-name").textContent = "—";
+        $("who-mail").textContent = "—";
+        $("profile-note").textContent = "";
+        hideMsg($("profile-msg"));
+        var box = $("avatar-box");
+        if (box) box.innerHTML = "<span>?</span>";
+      }
+
       function friendlyError(err) {
         var code = (err && err.code) || "";
         var map = {
@@ -1550,7 +1616,7 @@ If the AI can't be reached yet, this panel shows a clearly labeled local snapsho
         $("tab-masuk").setAttribute("aria-selected", mode === "masuk" ? "true" : "false");
         $("field-name").classList.toggle("hidden", mode === "masuk");
         $("auth-submit").textContent = mode === "daftar" ? "Sign up" : "Sign in";
-        $("in-pass").setAttribute("autocomplete", mode === "daftar" ? "new-password" : "current-password");
+        $("in-pass").setAttribute("autocomplete", "off");
         hideMsg($("auth-msg"));
       }
       $("tab-daftar").addEventListener("click", function () { setMode("daftar"); });
@@ -1618,6 +1684,8 @@ If the AI can't be reached yet, this panel shows a clearly labeled local snapsho
 
       /* ---------- Keluar ---------- */
       $("btn-logout").addEventListener("click", function () {
+        clearAuthForm();
+        clearProfileForm();
         if (!sdkReady) return;
         auth.signOut().catch(function (err) {
           showMsg($("profile-msg"), friendlyError(err), "err");
@@ -1742,14 +1810,22 @@ If the AI can't be reached yet, this panel shows a clearly labeled local snapsho
         if (typeof renderAlerts === "function") renderAlerts();
       }
       $("dash-logout").addEventListener("click", function () {
+        clearAuthForm();
+        clearProfileForm();
         if (!sdkReady || !auth) return;
         auth.signOut().catch(function () { /* abaikan */ });
+      });
+      // Browser bisa memulihkan isi form dari bfcache saat halaman
+      // ditampilkan lagi — kosongkan bila tidak sedang masuk.
+      window.addEventListener("pageshow", function () {
+        if (!currentUser) clearAuthForm();
       });
       /* ---------- Pantau status login ---------- */
       if (sdkReady) {
         auth.onAuthStateChanged(function (user) {
           currentUser = user || null;
           if (user) {
+            clearAuthForm();
             $("auth-view").classList.add("hidden");
             $("user-view").classList.remove("hidden");
             db.collection("users").doc(user.uid).get()
@@ -1766,6 +1842,8 @@ If the AI can't be reached yet, this panel shows a clearly labeled local snapsho
             startWatchlist(user.uid);
           } else {
             existingProfile = null;
+            clearAuthForm();
+            clearProfileForm();
             $("user-view").classList.add("hidden");
             $("auth-view").classList.remove("hidden");
             stopWatchlist();
